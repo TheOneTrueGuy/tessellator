@@ -1,0 +1,46 @@
+The image you provided seems to outline a concept mapping or knowledge graphing algorithm that aims to explore a "concept space" by identifying perpendicular or divergent concepts from an initial set of contrasting "seed" concepts.
+
+The basic idea appears to be:
+
+1. Start with two opposing/contrasting seed concepts (e.g. "Cat" and "Dog")
+2. Use a language model (initially an LLM, but you suggest word2vec encodings may work better) to find concepts that are perpendicular/divergent from the axis defined by the seed concepts
+3. Add these new perpendicular concepts to the graph, connected to the previous concepts
+4. Recursively query the LM using the new perpendicular concepts as new seed axes to expand the concept graph further
+
+Your Python code implements this flow by:
+
+1. Maintaining a set of unique concepts encountered
+2. Using a queue to perform breadth-first expansion of the graph from the seed concepts
+3. Prompting the OpenAI API (or a local model) to retrieve perpendicular concepts for the current concept axis
+4. Adding those new concepts as nodes, connected to the current concept, in the NetworkX graph
+5. Putting the new concepts back in the queue for further expansion
+
+Regarding your question about using word2vec instead of an LLM, word embeddings could indeed be more suitable for capturing semantic relationships between concepts in a geometric vector space. The general approach would be:
+
+1. Obtain pre-trained word embeddings (e.g. word2vec, GloVe) or train them on a relevant corpus
+2. Represent the seed concepts as vectors using the embedding
+3. Find other concept vectors that are approximately perpendicular (have low cosine similarity) to the vector between the two seed concept vectors
+4. Use those perpendicular concept vectors/words to expand the graph
+
+This treats the concept space as a continuous vector space, rather than relying on an LLM's discrete text generation. You'd need to implement vector arithmetic, cosine similarity, and nearest neighbor lookup rather than calling an LM API.
+
+Some potential challenges with either approach include: defining what truly constitutes a "perpendicular" concept, avoiding drift into unrelated areas of the concept space, and effectively visualizing/exploring the resulting high-dimensional graph. Curating seed concepts and constraining the domains could help. But overall, this type of algorithm could be an interesting way to build conceptual knowledge graphs from unstructured data.
+
+Yes, there are ways you could potentially incorporate word embeddings to reinforce and enhance an LLM's understanding of the spatial relationships and orientations within the concept space you are trying to map. Here are a few approaches you could consider:
+
+1. **Provide Embedding Vectors as Part of the Prompt**:
+You could include the word embedding vectors for the seed concepts as part of the prompt to the LLM. This would give the language model explicit geometric information about how those concepts are positioned in the vector space, which could help it reason about perpendicular or divergent concepts more accurately.
+
+2. **Fine-tune the LLM on Embedding-Augmented Data**:
+You could create a dataset of examples where seed concepts and their corresponding perpendicular/divergent concepts are listed, along with the embedding vectors for each word. Then, use this data to fine-tune the LLM, allowing it to learn the mapping between vector geometries and conceptual relationships.
+
+3. **Use Embeddings to Re-rank LLM Outputs**:
+Generate potential perpendicular concepts from the LLM, but then re-rank or re-score them using their embedding vectors and cosine similarities to the original seed concept vectors. This would prioritize concepts that are truly geometrically perpendicular in the embedding space.
+
+4. **Retrieval-Augmented Generation**:
+Rather than generating perpendicular concepts from scratch, use embedding nearest neighbors to retrieve a set of potentially relevant concepts from the embedding space. Then provide these to the LLM as potential perpendicular options to expand upon or rerank.
+
+5. **Embedding-Based Concept Space Visualization**:
+Project the embedding vectors for generated concepts into 2D or 3D space using dimensionality reduction (e.g. PCA, t-SNE). Then visualize the emerging concept space geometry and use that to guide feedback to the LLM about which areas/concepts diverge as expected.
+
+The general idea is to leverage the geometric inductive biases captured in pre-trained word embeddings to better inform and steer the LLM's generation of conceptually perpendicular terms. This hybrid approach could allow you to combine the strengths of deep language understanding from LLMs and vector space reasoning from embeddings.

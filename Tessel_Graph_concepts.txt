@@ -1,0 +1,207 @@
+The image outlines an interesting approach to explore a conceptual space using a tessellating graph function and language models. Here's a high-level overview of how we could potentially implement this algorithm:
+
+1. Define the initial subject or concept we want to explore (e.g., "Subject A").
+
+2. Prompt a language model to suggest contrasting or opposing ideas/perspectives to the initial subject (e.g., "Subject B" as the "opposite" of "Subject A").
+
+3. Prompt the language model to suggest ideas that are "substantially different" from both the initial subject and its opposite (e.g., "Subject C", "Subject D").
+
+4. Connect these subjects as nodes in a graph, with the "perpendicular" ideas forming new axes orthogonal to the initial "Subject A" - "Subject B" axis.
+
+5. Recursively prompt the language model to explore concepts along these new axes, filling out the "tessellating" graph structure.
+
+6. Visualize and analyze the resulting graph to gain insights into the conceptual relationships and potential new ideas.
+
+Pseudocode:
+
+```
+define initial_subject, opposite_subject
+subject_queue = [initial_subject, opposite_subject]
+graph = Graph()
+graph.add_nodes([initial_subject, opposite_subject])
+graph.add_edge(initial_subject, opposite_subject)
+
+while subject_queue:
+    current_subject = subject_queue.pop(0)
+    new_subjects = prompt_lm(f"Suggest ideas substantially different from '{current_subject}'")
+    perpendicular_subjects = [s for s in new_subjects if s not in graph.nodes]
+    subject_queue.extend(perpendicular_subjects)
+    graph.add_nodes(perpendicular_subjects)
+    for new_subject in perpendicular_subjects:
+        graph.add_edge(current_subject, new_subject)
+
+visualize_graph(graph)
+```
+
+Example LLM prompts:
+
+- For initial subject: "Describe the concept of [subject]."
+- For opposite subject: "Suggest an idea that contrasts or opposes the concept of [subject]."
+- For perpendicular subjects: "Propose concepts that are substantially different from both [subject A] and [subject B]."
+
+This is just one potential approach, and there are many ways we could refine or adapt the algorithm based on the desired goals and characteristics of the conceptual space being explored. Additionally, we'd need to carefully curate and filter the language model's outputs to ensure high-quality, relevant concepts are added to the graph.
+
+
+Sure, that's a great way to phrase the prompt for the perpendicular subjects. Here's how we could modify the example prompt:
+
+For perpendicular subjects: "Suggest ideas that are perpendicular to the axis formed by [subject A] and [subject B]."
+
+This framing clearly articulates that we're looking for concepts that are orthogonal or substantially different from the existing axis defined by the two subjects.
+
+The pseudocode section could be updated as follows:
+
+```python
+while subject_queue:
+    current_subject_a, current_subject_b = subject_queue.pop(0), subject_queue.pop(0)
+    new_subjects = prompt_lm(f"Suggest ideas that are perpendicular to the axis formed by '{current_subject_a}' and '{current_subject_b}'")
+    perpendicular_subjects = [s for s in new_subjects if s not in graph.nodes]
+    subject_queue.extend(perpendicular_subjects)
+    graph.add_nodes(perpendicular_subjects)
+    graph.add_edge(current_subject_a, current_subject_b)
+    for new_subject in perpendicular_subjects:
+        graph.add_edge(current_subject_a, new_subject)
+        graph.add_edge(current_subject_b, new_subject)
+
+visualize_graph(graph)
+```
+
+By explicitly referencing the axis formed by the two current subjects in the prompt, we can better guide the language model to generate ideas that are truly perpendicular or substantially divergent from that axis in the conceptual space.
+
+This phrasing reinforces the notion of building out a tessellating, multidimensional structure, with each new axis representing a different "slice" through the conceptual space that is orthogonal to the previous axes.
+
+Sure, here's an example implementation of the algorithm using Python and the OpenAI API for generating text from a language model. Note that you'll need to have the `openai` library installed (`pip install openai`) and set up your OpenAI API key in the code.
+
+```python
+import openai
+import json
+from graphviz import Digraph
+
+# Set up OpenAI API key
+openai.api_key = "YOUR_OPENAI_API_KEY"
+
+def prompt_lm(prompt):
+    response = openai.Completion.create(
+        engine="text-davinci-003",
+        prompt=prompt,
+        max_tokens=100,
+        n=3,
+        stop=None,
+        temperature=0.7,
+    )
+    return [choice.text.strip() for choice in response.choices]
+
+def generate_graph():
+    initial_subject = "Artificial Intelligence"
+    opposite_subject = prompt_lm(f"Suggest an idea that contrasts or opposes the concept of {initial_subject}")[0]
+
+    subject_queue = [initial_subject, opposite_subject]
+    graph = Digraph()
+    graph.node(initial_subject)
+    graph.node(opposite_subject)
+    graph.edge(initial_subject, opposite_subject)
+
+    while subject_queue:
+        current_subject_a, current_subject_b = subject_queue.pop(0), subject_queue.pop(0)
+        prompt = f"Suggest ideas that are perpendicular to the axis formed by '{current_subject_a}' and '{current_subject_b}'"
+        new_subjects = prompt_lm(prompt)
+        perpendicular_subjects = [s for s in new_subjects if s not in graph.body]
+        subject_queue.extend(perpendicular_subjects)
+        for new_subject in perpendicular_subjects:
+            graph.node(new_subject)
+            graph.edge(current_subject_a, new_subject)
+            graph.edge(current_subject_b, new_subject)
+
+    return graph
+
+# Generate the graph
+graph = generate_graph()
+
+# Save graph as a text file
+with open("concept_graph.txt", "w", encoding="utf-8") as f:
+    f.write(str(graph))
+
+# Save graph as a JSON object
+graph_json = json.loads(graph.source)
+with open("concept_graph.json", "w", encoding="utf-8") as f:
+    json.dump(graph_json, f, indent=2)
+```
+
+This code defines two functions:
+
+1. `prompt_lm(prompt)`: This function takes a prompt string as input and uses the OpenAI API to generate up to 3 different responses using the `text-davinci-003` model.
+
+2. `generate_graph()`: This function implements the algorithm we discussed. It starts with an initial subject and generates an opposing subject using the language model. It then builds the graph by recursively prompting the language model for "perpendicular" subjects and adding them as nodes and edges to the graph.
+
+The `generate_graph()` function returns a `graphviz.Digraph` object representing the concept graph.
+
+The code then calls `generate_graph()` and saves the resulting graph in two formats:
+
+1. As a text file (`concept_graph.txt`) containing the graph structure in the DOT language used by Graphviz.
+2. As a JSON file (`concept_graph.json`) containing the JSON representation of the graph structure.
+
+Note that you'll need to replace `"YOUR_OPENAI_API_KEY"` with your actual OpenAI API key for the code to work.
+
+Also, keep in mind that this is a basic implementation, and you may need to adjust the prompts, parameters, and filtering logic based on the quality of the generated concepts and the desired characteristics of your conceptual space.
+
+
+
+I'm just thinking here, I'd like the option of extending the perpendiculars to have their own axis and I'd like to also be able to extend axes past their current poles to explore "super" regions in that conceptual direction beyond the pole, so to speak. Is there a good library for interacting with the graph nodes visually via the mouse and keyboard that also allows good 3D visualization?
+
+Sure! You can achieve this by modifying the generate_graph() function to create separate axes for each perpendicular subject and allow the language model to generate ideas beyond the current poles.
+
+Here's an updated version of the generate_graph() function that incorporates these changes:
+
+
+def generate_graph():
+    initial_subject = "Artificial Intelligence"
+    opposite_subject = prompt_lm(f"Suggest an idea that contrasts or opposes the concept of {initial_subject}")[0]
+
+    subject_queue = [initial_subject, opposite_subject]
+    graph = Digraph()
+    graph.node(initial_subject)
+    graph.node(opposite_subject)
+    graph.edge(initial_subject, opposite_subject)
+
+    # Define a dictionary to store the current axes and their corresponding poles
+    axes = {
+        initial_subject: opposite_subject,
+        opposite_subject: initial_subject,
+    }
+
+    while subject_queue:
+        current_subject_a, current_subject_b = subject_queue.pop(0), subject_queue.pop(0)
+
+        # Get the current axis and its pole
+        current_axis, current_pole = axes[current_subject_a], axes[current_subject_b]
+
+        # Prompt the language model for perpendicular subjects
+        prompt = f"Suggest ideas that are perpendicular to the axis formed by '{current_subject_a}' and '{current_subject_b}'"
+        new_subjects = prompt_lm(prompt)
+
+        # Filter out duplicate or invalid suggestions
+        new_subjects = [s for s in new_subjects if s not in graph.body and s != current_subject_a and s != current_subject_b]
+
+        # Add the new subjects to the graph and the subject queue
+        for new_subject in new_subjects:
+            graph.node(new_subject)
+            graph.edge(current_subject_a, new_subject)
+            graph.edge(current_subject_b, new_subject)
+            subject_queue.append(new_subject)
+
+        # Update the axes and poles
+        axes[new_subject] = current_pole
+        axes[current_pole] = new_subject
+
+    return graph
+
+In this updated implementation, we've added a dictionary called axes to keep track of the current axes and their corresponding poles. We use this dictionary to update the axes and poles when we add new perpendicular subjects to the graph.
+
+We've also modified the prompt for the language model to include the current axis and pole, so that the model generates ideas that are truly perpendicular to the current axis.
+
+With these changes, the algorithm now allows for the exploration of "super" regions beyond the current poles by adding new axes and poles as the language model generates new ideas.
+
+Regarding a library for interacting with the graph nodes visually via the mouse and keyboard that also allows good 3D visualization, you can use a library like Graphviz or PyGraphviz for visualizing the graph structure. You can use the graphviz command-line tool or a Python library like pygraphviz to render the graph to an image file or display it interactively in a GUI environment.
+
+For 3D visualization, you can use a library like matplotlib or plotly to create an interactive 3D plot of the graph structure. You can also use a library like networkx to perform graph layout and visualization.
+
+Keep in mind that the specific library choice and implementation details will depend on your specific requirements and the complexity of your graph visualization needs.

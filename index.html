@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Concept Graph</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.2/vis-network.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        #mynetwork {
+            width: 100%;
+            height: 600px;
+            border: 1px solid lightgray;
+        }
+        #input-container {
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div id="input-container">
+        <input type="text" id="concept1" placeholder="First concept">
+        <input type="text" id="concept2" placeholder="Second concept">
+        <button onclick="generateGraph()">Generate Graph</button>
+    </div>
+    <div id="mynetwork"></div>
+    <script>
+        let network;
+        let graphData;
+
+        function drawGraph(data) {
+            const container = document.getElementById('mynetwork');
+            const options = {
+                nodes: {
+                    shape: 'dot',
+                    size: 30,
+                    font: {
+                        size: 12,
+                        color: '#ffffff'
+                    },
+                    borderWidth: 2
+                },
+                edges: {
+                    width: 2
+                },
+                interaction: {
+                    hover: true,
+                    zoomView: true,
+                    dragView: true
+                }
+            };
+
+            network = new vis.Network(container, data, options);
+
+            network.on("doubleClick", function (params) {
+                if (params.nodes.length > 0) {
+                    expandNode(params.nodes[0]);
+                }
+            });
+        }
+
+        function expandNode(nodeId) {
+            $.ajax({
+                url: '/expand_node',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({ node: nodeId, graph: graphData }),
+                success: function(response) {
+                    graphData = response;
+                    drawGraph(graphData);
+                }
+            });
+        }
+
+        function generateGraph() {
+            const concept1 = $('#concept1').val();
+            const concept2 = $('#concept2').val();
+            const url = `/initial_graph?concept1=${encodeURIComponent(concept1)}&concept2=${encodeURIComponent(concept2)}`;
+            
+            $.getJSON(url, function(data) {
+                graphData = data;
+                drawGraph(data);
+            });
+        }
+
+        $(document).ready(function() {
+            // Load default graph on page load
+            generateGraph();
+        });
+    </script>
+</body>
+</html>

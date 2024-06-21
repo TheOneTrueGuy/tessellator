@@ -9,8 +9,9 @@ encoding/embedded spaces could be extracted by reverse token look-up.
 
 I would also like to either replace or augment the LLM by turning each concept subject heading into an embedding so that exactly geometric relationships 
 could be established if possible.
+![
+IMG_20240319_170422.jpg contains the original middle-of-the-night post-dream scribble that inspired this design of intention.Alt text](IMG_20240319_170422.jpg)
 
-IMG_20240319_170422.jpg contains the original middle-of-the-night post-dream scribble that inspired this design of intention.
 
 Currently uses the OpenAI API and LM Studio for access to free local models ensuring your privacy.
 

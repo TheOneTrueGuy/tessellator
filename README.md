@@ -1,3 +1,6 @@
+June 20th, 2024 update:
+Added tessel4.py module, web_interface2_app.py for flask server interface and index.html for user interface. No testing yet but all the code looks good.
+
 The idea behind this code and text is to find a decent way to explore and volumize a concept space from a single or few concepts
 which are arranged as axis or linear relationships and then either perpendicular and/or supernominal concepts are establsihed in 
 a graph network around these seed cencepts. Once a primary (depth-of-n) graph is created I want to add a visual interface that would allow

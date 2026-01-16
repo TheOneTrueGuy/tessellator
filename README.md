@@ -1,3 +1,4 @@
+Jan 15, 2026 update: signifigant progress in the last few months, still uploading the updated files. Should have time before February.
 June 20th, 2024 update:
 Added tessel4.py module, web_interface2_app.py for flask server interface and index.html for user interface. No testing yet but all the code looks good.
 

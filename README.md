@@ -7,8 +7,8 @@ a graph network around these seed cencepts. Once a primary (depth-of-n) graph is
 the selection of distant graph nodes so that the concept space between them could be spanned by an interpolation process and the intervening
 encoding/embedded spaces could be extracted by reverse token look-up.
 
-I would also like to either replace or augment the LLM by turning each concept subject heading into an embedding so that exactly geometric relationships 
-could be established if possible.
+I've made progress replacing and/or augmenting the LLM by turning each concept subject heading into an embedding so that exactly geometric relationships 
+can be established.
 
 Currently uses the OpenAI API and LM Studio for access to free local models ensuring your privacy.
 

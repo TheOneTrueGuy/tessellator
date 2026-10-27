@@ -13,6 +13,14 @@ Working end-to-end: local Flask UI + RunPod pod doing all model work.
 - **Secrets**: RunPod API key in `.venv/runpod_key.txt`, pod token/id in `.venv/*.txt` — all gitignored along with `runpod.env`.
 - **Embedding cache**: `.cache/embeddings.json`, keyed `backend|model|text` — persists across backend swaps.
 
+### Pod spec (captured 2026-10-27 via `pod_ctl.py spec`)
+Recreate on RunPod secure cloud: image `ollama/ollama:latest`, port `11434/http`,
+env `OLLAMA_HOST=0.0.0.0`, 1x RTX 2000 Ada, 6 vCPU / 31GB RAM, **40GB container
+disk, no volume** — models die with `terminate`. After creating a new pod:
+1. `.venv/pod_id.txt` ← new pod id; `runpod.env` `OLLAMA_BASE_URL` ← `https://<id>-11434.proxy.runpod.net`
+2. Wait for ollama up, then pull models over HTTP:
+   `curl <base>/api/pull -d '{"name":"qwen2.5:7b"}'` and `{"name":"nomic-embed-text"}`
+
 ### Gotchas discovered
 - `vllm/vllm-openai` pod image has **no sshd** — can't exec into it. That's why we're on Ollama (serves chat + embeddings on one port, models pulled via `/api/pull` over HTTP).
 - RunPod's Cloudflare proxy **403s `python-urllib`** UA — all urllib calls send `User-Agent: curl/8.6.0`.

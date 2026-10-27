@@ -1,4 +1,4 @@
-"""Control the RunPod pod: status | stop | start | terminate | url
+"""Control the RunPod pod: status | spec | stop | start | terminate | url
 
 Usage: .venv/Scripts/python pod_ctl.py status
 
@@ -29,6 +29,16 @@ def status():
     print(json.dumps(r["data"]["pod"], indent=1))
 
 
+def spec():
+    # Full config dump - enough to recreate the pod if it's terminated.
+    r = gql('''query($id: String!) { pod(input: {podId: $id}) {
+      name imageName dockerArgs ports env gpuCount vcpuCount memoryInGb
+      containerDiskInGb volumeInGb volumeMountPath templateId machineId
+      machine { gpuDisplayName }
+    } }''', {"id": POD})
+    print(json.dumps(r["data"]["pod"], indent=1))
+
+
 def stop():
     # Pod keeps its disk while stopped; you pay storage only (~cents/day), not GPU.
     print(json.dumps(gql('mutation($id: String!) { podStop(input: {podId: $id}) { id desiredStatus } }', {"id": POD})))
@@ -48,7 +58,7 @@ def url():
     print(f"https://{POD}-11434.proxy.runpod.net")
 
 
-CMDS = {"status": status, "stop": stop, "start": start, "terminate": terminate, "url": url}
+CMDS = {"status": status, "spec": spec, "stop": stop, "start": start, "terminate": terminate, "url": url}
 if __name__ == "__main__":
     cmd = sys.argv[1] if len(sys.argv) > 1 else "status"
     if cmd not in CMDS:

@@ -4,9 +4,10 @@
 
 Working end-to-end: local Flask UI + RunPod pod doing all model work.
 
-- **Pod**: `cg3rnjuzxrcam6`, RTX 2000 Ada 16GB, secure cloud, ~$0.24/hr.
-  (redeployed 2026-10-27 via `pod_ctl.py deploy` after the original pod's host
-  ran out of GPU capacity; fresh disk → models had to be re-pulled)
+- **Pod**: none running (last one terminated 2026-10-27 after its id was
+  pushed to a public repo — the proxy URL is unauthenticated). Recreate via
+  `pod_ctl.py deploy` (see spec below), update `runpod.env` +
+  `.venv/pod_id.txt`. **Never put a pod id in tracked files.**
   Ollama serving `qwen2.5:7b` (chat) + `nomic-embed-text` (embeddings).
   Control: `.venv/Scripts/python pod_ctl.py status|stop|start|terminate`
   `stop` keeps the disk (models stay cached, ~pennies/day); `terminate` deletes everything.
@@ -26,7 +27,10 @@ disk, no volume** — models die with `terminate`. After creating a new pod:
 ### Gotchas discovered
 - `vllm/vllm-openai` pod image has **no sshd** — can't exec into it. That's why we're on Ollama (serves chat + embeddings on one port, models pulled via `/api/pull` over HTTP).
 - RunPod's Cloudflare proxy **403s `python-urllib`** UA — all urllib calls send `User-Agent: curl/8.6.0`.
-- RunPod proxy URLs are unauthenticated — anyone with the URL can use the pod. Stop it when idle.
+- RunPod proxy URLs are unauthenticated — anyone with the URL can use the pod.
+  The pod id alone is enough to build the URL, so it must stay out of tracked
+  files (learned the hard way 2026-10-27: id sat in DEV.md on a public repo,
+  pod had to be terminated). Stop pods when idle.
 - `TESSELLATOR_*_BACKEND` env vars only take effect when the passed backend is `auto`/unset (fixed).
 - Frontend libs are vendored in `static/vendor/` (CDN 404 + offline robustness). Don't re-add CDN links.
 

@@ -1,3 +1,18 @@
+# Tessellator — Concept Space Explorer
+
+The project now runs as a local Flask app (`app.py` + `tessellator/` package)
+with pluggable model backends — a RunPod Ollama pod, local Ollama, LM Studio,
+OpenAI-compatible endpoints, or hash/mock dev fallbacks. Seed an axis between
+two concepts, tessellate perpendicular concepts into a graph, project through
+PCA "concept lenses" in 3D, and interpolate between nodes.
+
+**[SETUP.md](SETUP.md)** — install, backend configuration, RunPod pod control, UI walkthrough.
+**[DEV.md](DEV.md)** — dev notes, gotchas, backlog.
+
+---
+
+## Earlier notes
+
 Jan 15, 2026 update: signifigant progress in the last few months, still uploading the updated files. Should have time before February.
 June 20th, 2024 update:
 Added tessel4.py module, web_interface2_app.py for flask server interface and index.html for user interface. No testing yet but all the code looks good.

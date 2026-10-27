@@ -1,4 +1,4 @@
-"""Control the RunPod pod: status | spec | stop | start | terminate | url
+"""Control the RunPod pod: status | spec | stop | start | terminate | deploy | url
 
 Usage: .venv/Scripts/python pod_ctl.py status
 
@@ -54,11 +54,39 @@ def terminate():
     print(json.dumps(gql('mutation($id: String!) { podTerminate(input: {podId: $id}) }', {"id": POD})))
 
 
+def deploy():
+    # Recreate the ollama pod from the spec captured in DEV.md, on whatever
+    # host has capacity. Writes the new pod id to .venv/pod_id.txt.
+    # Optional arg: substring to match a different GPU type, e.g. `deploy 4000 Ada`.
+    gpu_match = sys.argv[2] if len(sys.argv) > 2 else "2000 Ada"
+    r = gql('query { gpuTypes { id displayName } }')
+    gpu_id = next((g["id"] for g in r["data"]["gpuTypes"]
+                   if gpu_match in g["displayName"]), None)
+    if not gpu_id:
+        sys.exit(f"no gpuType matching {gpu_match!r}: "
+                 f"{[g['displayName'] for g in r['data']['gpuTypes']]}")
+    out = gql('''mutation($input: PodFindAndDeployOnDemandInput!) {
+      podFindAndDeployOnDemand(input: $input) { id machine { gpuDisplayName } }
+    }''', {"input": {
+        "cloudType": "SECURE", "gpuCount": 1, "gpuTypeId": gpu_id,
+        "containerDiskInGb": 40, "volumeInGb": 0,
+        "minVcpuCount": 4, "minMemoryInGb": 16,
+        "name": "tessellator-ollama", "imageName": "ollama/ollama:latest",
+        "dockerArgs": "", "ports": "11434/http",
+        "env": [{"key": "OLLAMA_HOST", "value": "0.0.0.0"}],
+    }})
+    print(json.dumps(out, indent=1))
+    pod = out["data"]["podFindAndDeployOnDemand"]
+    if pod and pod.get("id"):
+        open(".venv/pod_id.txt", "w").write(pod["id"])
+        print(f"new pod id -> .venv/pod_id.txt; url: https://{pod['id']}-11434.proxy.runpod.net")
+
+
 def url():
     print(f"https://{POD}-11434.proxy.runpod.net")
 
 
-CMDS = {"status": status, "spec": spec, "stop": stop, "start": start, "terminate": terminate, "url": url}
+CMDS = {"status": status, "spec": spec, "stop": stop, "start": start, "terminate": terminate, "deploy": deploy, "url": url}
 if __name__ == "__main__":
     cmd = sys.argv[1] if len(sys.argv) > 1 else "status"
     if cmd not in CMDS:

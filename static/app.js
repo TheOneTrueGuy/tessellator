@@ -146,8 +146,12 @@ async function createLens() {
 function addLensItem(j) {
   const div = document.createElement("div");
   div.className = "lens-item";
+  const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
   div.innerHTML =
-    `<b>${j.name}</b><span class="meta">k=${j.k} · ${(100 * j.variance_kept).toFixed(0)}% var · ${j.prompts.length} prompts</span>`;
+    `<b>${j.name}</b><span class="meta">k=${j.k} · ${(100 * j.variance_kept).toFixed(0)}% var · ${j.prompts.length} prompts</span>` +
+    `<details class="prompts"><summary>prompts</summary><ul>` +
+    j.prompts.map(p => `<li>${esc(p)}</li>`).join("") +
+    `</ul></details>`;
   const act = document.createElement("div");
   act.className = "actions";
   const btn = document.createElement("button");

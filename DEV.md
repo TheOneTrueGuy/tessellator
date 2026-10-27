@@ -4,7 +4,9 @@
 
 Working end-to-end: local Flask UI + RunPod pod doing all model work.
 
-- **Pod**: `19s8c0z7oj6pi9`, RTX 2000 Ada 16GB, secure cloud, ~$0.24/hr.
+- **Pod**: `cg3rnjuzxrcam6`, RTX 2000 Ada 16GB, secure cloud, ~$0.24/hr.
+  (redeployed 2026-10-27 via `pod_ctl.py deploy` after the original pod's host
+  ran out of GPU capacity; fresh disk → models had to be re-pulled)
   Ollama serving `qwen2.5:7b` (chat) + `nomic-embed-text` (embeddings).
   Control: `.venv/Scripts/python pod_ctl.py status|stop|start|terminate`
   `stop` keeps the disk (models stay cached, ~pennies/day); `terminate` deletes everything.
@@ -37,6 +39,7 @@ disk, no volume** — models die with `terminate`. After creating a new pod:
 ### Features
 - [ ] **Save/load state**: `Tessellator.from_json()` exists (builder.py) but has no API endpoints or UI. Add `/api/save`, `/api/load`, buttons; persist graph + lenses + `_vecs`.
 - [ ] **Lens persistence**: lenses currently live in memory only; rebuild on restart needs LLM + embed calls again.
+- [ ] **Restore lenses in UI on boot**: server keeps `t.lenses` across page reloads but `boot()` doesn't re-render lens items, and `/api/state` returns only names. Add `GET /api/lenses` (name, k, variance, prompts — so items render without re-embedding or re-generating) and populate `lensList` in `boot()`.
 - [ ] Session autosave to `.cache/graph.json`.
 - [ ] Export: graph GEXF/GraphML for Gephi (`.gexf` already gitignored — suggests this was intended).
 - [ ] Lens-aware edge weighting — `lens_similarities()` exists, unused by UI.

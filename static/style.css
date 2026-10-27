@@ -60,6 +60,9 @@ main { flex: 1; display: flex; min-width: 0; }
   display: flex; flex-direction: column; gap: 4px;
 }
 .lens-item .meta { color: #789; font-size: 11px; }
+.lens-item .prompts summary { color: #789; font-size: 11px; cursor: pointer; }
+.lens-item .prompts ul { margin: 4px 0 2px; padding-left: 18px; max-height: 160px; overflow-y: auto; }
+.lens-item .prompts li { font-size: 11px; color: #9ab; }
 .lens-item .actions { display: flex; gap: 6px; }
 
 #status {

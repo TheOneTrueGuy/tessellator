@@ -59,6 +59,18 @@
       <div id="lensList"></div>
     </section>
 
+    <section>
+      <h2>Backends</h2>
+      <label>embed <select id="embedBackend"></select></label>
+      <div id="embedCfg" class="backend-cfg"></div>
+      <label>llm <select id="llmBackend"></select></label>
+      <div id="llmCfg" class="backend-cfg"></div>
+      <button id="backendApply">Apply backends</button>
+      <p class="hint">✓ = detected. Switching the embedder resets the graph
+        (new vector space); the llm swaps freely. hash/mock need no models —
+        demo mode.</p>
+    </section>
+
   </aside>
 
   <main>

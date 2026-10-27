@@ -65,6 +65,9 @@ main { flex: 1; display: flex; min-width: 0; }
 .lens-item .prompts li { font-size: 11px; color: #9ab; }
 .lens-item .actions { display: flex; gap: 6px; }
 
+.backend-cfg { display: flex; flex-direction: column; gap: 4px; }
+.backend-cfg input { font-size: 12px; padding: 5px 7px; }
+
 #status {
   position: fixed; bottom: 0; left: 0; right: 0; padding: 4px 16px;
   background: #121316cc; font-size: 12px; color: #8ab; min-height: 20px;

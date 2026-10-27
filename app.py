@@ -9,16 +9,18 @@ Config via env vars (see tessellator/embeddings.py and tessellator/llm.py):
   TESSELLATOR_LLM_BACKEND    auto|lmstudio|ollama|openai|mock
 """
 
+import importlib.util
 import os
 import threading
 import time
 import traceback
+import urllib.request
 
 import numpy as np
 from flask import Flask, jsonify, render_template, request
 
 from tessellator.builder import Tessellator
-from tessellator.embeddings import make_embedder
+from tessellator.embeddings import _HEADERS, make_embedder
 from tessellator.llm import make_llm
 from tessellator.vocab import load_vocab
 
@@ -171,6 +173,100 @@ def reset():
     return _err(go)
 
 
+def _reachable(url, path):
+    try:
+        req = urllib.request.Request(url.rstrip("/") + path, headers=_HEADERS)
+        with urllib.request.urlopen(req, timeout=2):
+            return True
+    except Exception:
+        return False
+
+
+@app.route("/api/backends")
+def backends():
+    """Probe which backends are reachable right now + what's active."""
+    ollama_url = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
+    lms_url = os.environ.get("LMSTUDIO_BASE_URL", "http://localhost:1234/v1")
+    ollama_up = _reachable(ollama_url, "/api/tags")
+    lms_up = _reachable(lms_url, "/models")
+    has_key = bool(os.environ.get("OPENAI_API_KEY"))
+    has_st = importlib.util.find_spec("sentence_transformers") is not None
+    remote = {
+        "ollama": {"available": ollama_up, "url": ollama_url},
+        "lmstudio": {"available": lms_up, "url": lms_url},
+        "openai": {"available": has_key},
+    }
+    return jsonify({
+        "active": {
+            "embed": _EMB.name if _EMB else None,
+            "embed_model": _EMB.model if _EMB else None,
+            "llm": _LLM.name if _LLM else None,
+            "llm_model": getattr(_LLM, "model", None) if _LLM else None,
+        },
+        "embed": {**remote, "local": {"available": has_st},
+                  "hash": {"available": True}, "auto": {"available": True}},
+        "llm": {**remote, "mock": {"available": True}, "auto": {"available": True}},
+    })
+
+
+_URL_ENV = {"ollama": "OLLAMA_BASE_URL", "lmstudio": "LMSTUDIO_BASE_URL",
+            "openai": "OPENAI_BASE_URL"}
+_MODEL_ENV = {
+    "embed": {"ollama": "OLLAMA_EMBED_MODEL", "lmstudio": "LMSTUDIO_EMBED_MODEL",
+              "openai": "OPENAI_EMBED_MODEL", "local": "ST_MODEL"},
+    "llm": {"ollama": "OLLAMA_CHAT_MODEL", "lmstudio": "LMSTUDIO_CHAT_MODEL",
+            "openai": "OPENAI_CHAT_MODEL"},
+}
+
+
+@app.route("/api/backend", methods=["POST"])
+def set_backend():
+    """Switch embed/llm backends at runtime. An embedder change means a new
+    vector space, so it clears the graph, _vecs, and lenses."""
+    def go():
+        global _EMB, _LLM
+        d = request.json
+        t = tessellator()
+        for kind in ("embed", "llm"):
+            name = d.get(kind)
+            if not name or name == "auto":
+                continue
+            if name in _URL_ENV and d.get(f"{kind}_url"):
+                os.environ[_URL_ENV[name]] = d[f"{kind}_url"].strip()
+            if d.get(f"{kind}_key"):
+                os.environ["OPENAI_API_KEY"] = d[f"{kind}_key"].strip()
+            menv = _MODEL_ENV[kind].get(name)
+            if menv and d.get(f"{kind}_model"):
+                os.environ[menv] = d[f"{kind}_model"].strip()
+
+        new_emb = new_cache = new_llm = None
+        if d.get("embed"):
+            new_emb, new_cache = make_embedder(d["embed"],
+                                               model=d.get("embed_model") or None)
+        if d.get("llm"):
+            new_llm = make_llm(d["llm"], vocab_terms=load_vocab(),
+                               model=d.get("llm_model") or None)
+        result = {"reset_graph": False}
+        if new_emb and (new_emb.name != _EMB.name or new_emb.model != _EMB.model):
+            _EMB = new_emb
+            t.embedder, t.cache = new_emb, new_cache
+            t.graph.clear()
+            t._vecs.clear()
+            t.lenses.clear()
+            t._vocab_vecs = None
+            t._vocab_dirty = True
+            result["reset_graph"] = True
+        if new_llm:
+            _LLM = t.llm = new_llm
+        result.update({
+            "embedder": _EMB.name, "embed_model": _EMB.model,
+            "llm": _LLM.name, "llm_model": getattr(_LLM, "model", "-"),
+            "reset_graph": result["reset_graph"],
+        })
+        return jsonify(result)
+    return _err(go)
+
+
 @app.route("/api/shutdown", methods=["POST"])
 def shutdown():
     """Stop the RunPod pod (disk kept for fast resume) then exit this server.
@@ -193,4 +289,17 @@ def shutdown():
 
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    import argparse
+    p = argparse.ArgumentParser(description="Tessellator UI server")
+    p.add_argument("--embed-backend", help="auto|ollama|lmstudio|openai|local|hash")
+    p.add_argument("--llm-backend", help="auto|ollama|lmstudio|openai|mock")
+    p.add_argument("--ollama-url", help="OLLAMA_BASE_URL, e.g. a RunPod proxy URL")
+    p.add_argument("--port", type=int, default=5000)
+    args = p.parse_args()
+    if args.ollama_url:
+        os.environ["OLLAMA_BASE_URL"] = args.ollama_url
+    if args.embed_backend:
+        os.environ["TESSELLATOR_EMBED_BACKEND"] = args.embed_backend
+    if args.llm_backend:
+        os.environ["TESSELLATOR_LLM_BACKEND"] = args.llm_backend
+    app.run(debug=True, port=args.port)

@@ -5,6 +5,7 @@ let network = null, nodesDS = null, edgesDS = null;
 let selection = [];            // ordered, max 2
 let activeLens = null;
 let pathTrace = null;          // interpolation polyline in the 3D view
+let currentEmbed = null;       // active embedder name (for reset warning)
 
 function status(msg, isErr) {
   const s = $("status");
@@ -220,15 +221,94 @@ async function extendPole() {
   } catch (e) { status(e.message, true); }
 }
 
+/* ---------- backends ---------- */
+
+const EMBED_BACKENDS = ["auto", "ollama", "lmstudio", "openai", "local", "hash"];
+const LLM_BACKENDS = ["auto", "ollama", "lmstudio", "openai", "mock"];
+const BACKEND_FIELDS = {
+  ollama:   [["url", "endpoint URL", "http://localhost:11434"],
+             ["model", "model (blank = env/default)", ""]],
+  lmstudio: [["url", "endpoint URL", "http://localhost:1234/v1"],
+             ["model", "model (blank = auto-detect)", ""]],
+  openai:   [["key", "API key", ""],
+             ["url", "base URL (blank = default)", ""],
+             ["model", "model override", ""]],
+  local:    [["model", "ST model", "all-MiniLM-L6-v2"]],
+  auto: [], hash: [], mock: [],
+};
+
+async function loadBackends() {
+  try {
+    const j = await getJSON("/api/backends");
+    fillSel("embedBackend", EMBED_BACKENDS, j.embed, j.active.embed);
+    fillSel("llmBackend", LLM_BACKENDS, j.llm, j.active.llm);
+    renderCfg("embed"); renderCfg("llm");
+  } catch (e) { status("backend probe failed: " + e.message, true); }
+}
+
+function fillSel(id, names, avail, active) {
+  $(id).innerHTML = names.map(n => {
+    const a = (avail && avail[n]) || {};
+    const note = n === "auto" ? "first available"
+      : a.available ? "✓"
+      : n === "openai" ? "needs API key"
+      : n === "local" ? "needs sentence-transformers"
+      : "not found";
+    return `<option value="${n}"${n === active ? " selected" : ""}>${n} — ${note}</option>`;
+  }).join("");
+}
+
+function renderCfg(kind) {
+  const fields = BACKEND_FIELDS[$(kind + "Backend").value] || [];
+  $(kind + "Cfg").innerHTML = fields.map(([f, ph, val]) =>
+    `<input id="${kind}_${f}"${f === "key" ? ' type="password"' : ""} placeholder="${ph}" value="${val}">`
+  ).join("");
+}
+
+async function applyBackends() {
+  const payload = {};
+  for (const kind of ["embed", "llm"]) {
+    const name = $(kind + "Backend").value;
+    payload[kind] = name;
+    for (const [f] of BACKEND_FIELDS[name] || []) {
+      const v = $(`${kind}_${f}`).value.trim();
+      if (v) payload[`${kind}_${f}`] = v;
+    }
+  }
+  if (payload.embed !== "auto" && payload.embed !== currentEmbed &&
+      !confirm("Switching the embedder resets the graph and lenses " +
+               "(different vector space). Continue?")) return;
+  status("switching backends…");
+  try {
+    const j = await api("/api/backend", payload);
+    currentEmbed = j.embedder;
+    refreshBadges(j);
+    if (j.reset_graph) {
+      selection = []; activeLens = null;
+      $("graph2d").innerHTML = ""; $("plot3d").innerHTML = "";
+      $("lensList").innerHTML = ""; $("pathOut").innerHTML = "";
+    }
+    status(`backends: embed ${j.embedder}·${j.embed_model}, llm ${j.llm}` +
+           (j.reset_graph ? " (graph reset)" : ""));
+    loadBackends();
+  } catch (e) { status(e.message, true); }
+}
+
 /* ---------- boot ---------- */
 
-async function boot() {
-  const j = await getJSON("/api/state");
+function refreshBadges(j) {
   const warn = (n) => (n === "hash" || n === "mock") ? " warn" : "";
   $("badges").innerHTML =
     `<span class="badge${warn(j.embedder)}">embed: ${j.embedder} · ${j.embed_model}</span>` +
     `<span class="badge${warn(j.llm)}">llm: ${j.llm}</span>`;
+}
+
+async function boot() {
+  const j = await getJSON("/api/state");
+  refreshBadges(j);
+  currentEmbed = j.embedder;
   if (j.graph.nodes.length) drawGraph(j.graph);
+  loadBackends();
 }
 
 $("buildBtn").onclick = build;
@@ -238,6 +318,9 @@ $("resetBtn").onclick = async () => { await api("/api/reset"); selection = [];
 $("interpBtn").onclick = interpolate;
 $("extendBtn").onclick = extendPole;
 $("lensBtn").onclick = createLens;
+$("embedBackend").onchange = () => renderCfg("embed");
+$("llmBackend").onchange = () => renderCfg("llm");
+$("backendApply").onclick = applyBackends;
 $("shutdownBtn").onclick = async () => {
   if (!confirm("Stop the RunPod pod and shut down this server?")) return;
   try {

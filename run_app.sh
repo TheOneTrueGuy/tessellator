@@ -3,4 +3,4 @@
 set -a
 source "$(dirname "$0")/runpod.env"
 set +a
-exec .venv/Scripts/python.exe app.py
+exec .venv/Scripts/python.exe app.py "$@"

@@ -1,0 +1,7 @@
+numpy>=2.0
+flask>=3.0
+networkx>=3.0
+openai>=1.0
+# optional: local embedding model backend (TESSELLATOR_EMBED_BACKEND=local)
+# large download (torch); omit on lightweight hosts like PythonAnywhere
+sentence-transformers>=3.0

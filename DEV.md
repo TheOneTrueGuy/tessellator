@@ -1,8 +1,11 @@
 # Tessellator — dev notes & backlog
 
-## Where things stand (2026-10-26)
+## Where things stand (2026-10-27)
 
-Working end-to-end: local Flask UI + RunPod pod doing all model work.
+Working end-to-end: local Flask UI + pluggable model backends (RunPod Ollama
+pod, local Ollama, LM Studio, OpenAI-compatible, hash/mock demo mode) — picked
+via env vars, CLI flags, or the live-probing *Backends* section in the UI.
+Setup docs in SETUP.md.
 
 - **Pod**: none running (last one terminated 2026-10-27 after its id was
   pushed to a public repo — the proxy URL is unauthenticated). Recreate via
@@ -37,14 +40,15 @@ disk, no volume** — models die with `terminate`. After creating a new pod:
 ## Backlog / ideas
 
 ### Next session
-- [ ] Try the concept-lens 3D view: create a lens (name + concept, e.g. "formality"), hit "3D view" to project the graph into the PCA subspace.
-- [x] Commit everything — done 2026-10-27 (`75c97b5`). NOTE: this file contains the pod ID, which is enough to reconstruct the unauthenticated proxy URL — redact before pushing if the repo is public.
+- [x] Try the concept-lens 3D view — works; tested with auto-generated "practical applications" prompt set.
+- [x] Commit everything — pushed to origin/main 2026-10-27.
 
 ### Features
-- [ ] **Save/load state**: `Tessellator.from_json()` exists (builder.py) but has no API endpoints or UI. Add `/api/save`, `/api/load`, buttons; persist graph + lenses + `_vecs`.
-- [ ] **Lens persistence**: lenses currently live in memory only; rebuild on restart needs LLM + embed calls again.
-- [ ] **Restore lenses in UI on boot**: server keeps `t.lenses` across page reloads but `boot()` doesn't re-render lens items, and `/api/state` returns only names. Add `GET /api/lenses` (name, k, variance, prompts — so items render without re-embedding or re-generating) and populate `lensList` in `boot()`.
-- [ ] Session autosave to `.cache/graph.json`.
+- [x] **Save/load state**: `/api/save`, `/api/load` + UI buttons (2026-10-27). Saves graph + lenses to `.cache/session.json`; lenses restore with no embed calls (basis/mean serialized), node vecs re-embed via disk cache. Refuses on embedder mismatch.
+- [x] **Lens persistence**: serialized in the session file via `ConceptLens.to_dict`/`from_dict`.
+- [x] **Restore lenses in UI on boot**: `GET /api/lenses` exists; `boot()` re-renders lens items.
+- [x] Session autosave → `.cache/session-autosave.json` on shutdown.
+- [x] RunPod in UI: deploy/resume/stop via `POST /api/runpod` with user-supplied key (memory only).
 - [ ] Export: graph GEXF/GraphML for Gephi (`.gexf` already gitignored — suggests this was intended).
 - [ ] Lens-aware edge weighting — `lens_similarities()` exists, unused by UI.
 - [ ] Interpolation path visualization already works in 3D; consider nearest-node snapping display.

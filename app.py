@@ -10,6 +10,7 @@ Config via env vars (see tessellator/embeddings.py and tessellator/llm.py):
 """
 
 import importlib.util
+import json
 import os
 import threading
 import time
@@ -21,6 +22,7 @@ from flask import Flask, jsonify, render_template, request
 
 from tessellator.builder import Tessellator
 from tessellator.embeddings import _HEADERS, make_embedder
+from tessellator.lens import ConceptLens
 from tessellator.llm import make_llm
 from tessellator.vocab import load_vocab
 
@@ -110,9 +112,7 @@ def lens():
                         concept=d.get("concept"),
                         k=int(d["k"]) if d.get("k") else None,
                         variance_keep=float(d.get("variance_keep", 0.80)))
-        return jsonify({"name": l.name, "k": l.k, "prompts": l.prompts,
-                        "variance_kept": l.variance_kept,
-                        "components": l.top_components()})
+        return jsonify(_lens_meta(l))
     return _err(go)
 
 
@@ -126,6 +126,74 @@ def project():
         return jsonify({"lens": lname, "k": lens.k,
                         "variance_kept": lens.variance_kept,
                         "coords": coords})
+    return _err(go)
+
+
+def _lens_meta(l):
+    return {"name": l.name, "k": l.k, "prompts": l.prompts,
+            "variance_kept": l.variance_kept,
+            "components": l.top_components()}
+
+
+@app.route("/api/lenses")
+def list_lenses():
+    t = tessellator()
+    return jsonify({"lenses": [_lens_meta(l) for l in t.lenses.values()]})
+
+
+def _session_payload():
+    if _T is None:
+        return None
+    g = _T.to_json()
+    return {
+        "version": 1,
+        "embedder": _EMB.name, "embed_model": _EMB.model,
+        "llm": _LLM.name if _LLM else None,
+        "graph": {"nodes": g["nodes"], "edges": g["edges"]},
+        "lenses": [l.to_dict() for l in _T.lenses.values()],
+    }
+
+
+@app.route("/api/save", methods=["POST"])
+def save():
+    def go():
+        d = request.json or {}
+        name = os.path.basename(d.get("file") or "session.json")
+        path = os.path.join(".cache", name)
+        payload = _session_payload()
+        if payload is None:
+            return jsonify({"error": "nothing to save yet"}), 400
+        os.makedirs(".cache", exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(payload, f)
+        return jsonify({"saved": path,
+                        "nodes": len(payload["graph"]["nodes"]),
+                        "lenses": len(payload["lenses"])})
+    return _err(go)
+
+
+@app.route("/api/load", methods=["POST"])
+def load():
+    def go():
+        global _T
+        d = request.json or {}
+        name = os.path.basename(d.get("file") or "session.json")
+        path = os.path.join(".cache", name)
+        tessellator()  # backends needed for embedder check + re-embedding
+        with open(path, encoding="utf-8") as f:
+            payload = json.load(f)
+        if (payload.get("embedder"), payload.get("embed_model")) != (_EMB.name, _EMB.model):
+            if not d.get("force"):
+                raise ValueError(
+                    f"session built with {payload.get('embedder')}·{payload.get('embed_model')}; "
+                    f"active is {_EMB.name}·{_EMB.model} — switch backends first or pass force=true")
+        t2 = Tessellator.from_json(payload["graph"], _EMB, _T.cache, _LLM)
+        for ld in payload.get("lenses", []):
+            l = ConceptLens.from_dict(ld)
+            t2.lenses[l.name] = l
+        _T = t2
+        return jsonify({"loaded": path, "graph": _T.to_json(),
+                        "lenses": [_lens_meta(l) for l in _T.lenses.values()]})
     return _err(go)
 
 
@@ -267,12 +335,92 @@ def set_backend():
     return _err(go)
 
 
+_pod_job = {"stage": "idle", "detail": "", "url": None, "pod_id": None, "error": None}
+
+
+def _runpod_job(d):
+    import pod_ctl
+    try:
+        if d.get("key"):
+            pod_ctl.set_session(key=d["key"].strip())
+        if d.get("pod_id"):
+            pod_ctl.set_session(pod=d["pod_id"].strip())
+        action = d.get("action", "deploy")
+        if action == "stop":
+            _pod_job["stage"] = "stopping"
+            pod_ctl.stop()
+            _pod_job["stage"] = "stopped"
+            return
+        _pod_job["stage"] = "deploying" if action == "deploy" else "resuming"
+        if action == "deploy":
+            pod = pod_ctl.deploy(gpu_match=d.get("gpu"))
+            if not pod:
+                raise RuntimeError("no instances available for that GPU (supply constraint)")
+            pod_id = pod["id"]
+        else:
+            pod_ctl.start()
+            pod_id = pod_ctl.get_pod()
+        url = f"https://{pod_id}-11434.proxy.runpod.net"
+        os.environ["OLLAMA_BASE_URL"] = url
+        _pod_job.update(pod_id=pod_id, url=url,
+                        stage="waiting", detail="for ollama to come up")
+        deadline = time.time() + 300
+        while time.time() < deadline:
+            if _reachable(url, "/api/tags"):
+                break
+            time.sleep(5)
+        else:
+            raise TimeoutError("ollama did not come up within 5 min")
+        _pod_job.update(stage="pulling", detail="checking models")
+        tags = json.loads(urllib.request.urlopen(
+            urllib.request.Request(f"{url}/api/tags", headers=_HEADERS),
+            timeout=10).read())
+        have = {m.get("name", "").split(":")[0] for m in tags.get("models", [])}
+        for m in (os.environ.get("OLLAMA_CHAT_MODEL", "qwen2.5:7b"),
+                  os.environ.get("OLLAMA_EMBED_MODEL", "nomic-embed-text")):
+            if m.split(":")[0] not in have:
+                _pod_job["detail"] = f"pulling {m}"
+                req = urllib.request.Request(
+                    f"{url}/api/pull", headers=_HEADERS,
+                    data=json.dumps({"name": m, "stream": False}).encode())
+                urllib.request.urlopen(req, timeout=900).read()
+        _pod_job.update(stage="ready", detail="")
+    except Exception as e:
+        _pod_job.update(stage="error", error=f"{type(e).__name__}: {e}")
+
+
+@app.route("/api/runpod", methods=["GET"])
+def runpod_status():
+    return jsonify(_pod_job)
+
+
+@app.route("/api/runpod", methods=["POST"])
+def runpod_op():
+    d = request.json or {}
+    if _pod_job["stage"] not in ("idle", "ready", "stopped", "error"):
+        return jsonify({"error": "pod operation already in progress",
+                        **_pod_job}), 409
+    _pod_job.update(stage="starting", detail="", error=None)
+    threading.Thread(target=_runpod_job, args=(d,), daemon=True).start()
+    return jsonify({"started": True})
+
+
 @app.route("/api/shutdown", methods=["POST"])
 def shutdown():
     """Stop the RunPod pod (disk kept for fast resume) then exit this server.
     Body: {"pod": "stop"|"terminate"|"none"} — default "stop"."""
     action = (request.json or {}).get("pod", "stop")
     result = {"pod": action}
+    payload = _session_payload()
+    if payload is not None:
+        try:
+            os.makedirs(".cache", exist_ok=True)
+            with open(os.path.join(".cache", "session-autosave.json"), "w",
+                      encoding="utf-8") as f:
+                json.dump(payload, f)
+            result["autosaved"] = ".cache/session-autosave.json"
+        except OSError:
+            pass
     if action in ("stop", "terminate"):
         try:
             import pod_ctl

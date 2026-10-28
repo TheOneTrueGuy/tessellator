@@ -68,6 +68,10 @@ main { flex: 1; display: flex; min-width: 0; }
 .backend-cfg { display: flex; flex-direction: column; gap: 4px; }
 .backend-cfg input { font-size: 12px; padding: 5px 7px; }
 
+.runpod summary { color: #9ab; font-size: 12px; cursor: pointer; }
+.runpod input { margin-top: 4px; font-size: 12px; padding: 5px 7px; }
+.runpod .row { margin-top: 4px; }
+
 #status {
   position: fixed; bottom: 0; left: 0; right: 0; padding: 4px 16px;
   background: #121316cc; font-size: 12px; color: #8ab; min-height: 20px;

@@ -19,6 +19,16 @@
   <aside id="controls">
 
     <section>
+      <h2>Session</h2>
+      <input id="saveFile" placeholder="file (default .cache/session.json)">
+      <div class="row">
+        <button id="saveBtn">Save</button>
+        <button id="loadBtn">Load</button>
+      </div>
+      <p class="hint">Graph + lenses persist under .cache/. Shutdown autosaves to session-autosave.json.</p>
+    </section>
+
+    <section>
       <h2>Seed axis</h2>
       <input id="conceptA" placeholder="pole A" value="Artificial Intelligence">
       <input id="conceptB" placeholder="pole B" value="Natural Intelligence">
@@ -66,6 +76,18 @@
       <label>llm <select id="llmBackend"></select></label>
       <div id="llmCfg" class="backend-cfg"></div>
       <button id="backendApply">Apply backends</button>
+      <details class="runpod">
+        <summary>RunPod (ollama pod)</summary>
+        <input id="rpKey" type="password" placeholder="RunPod API key (memory only, not saved)">
+        <input id="rpGpu" placeholder="GPU match (blank = 2000 Ada)">
+        <input id="rpPodId" placeholder="existing pod id (for resume/stop)">
+        <div class="row">
+          <button id="rpDeploy" class="small">Deploy</button>
+          <button id="rpResume" class="small">Resume</button>
+          <button id="rpStop" class="small">Stop</button>
+        </div>
+        <div id="rpStatus" class="hint"></div>
+      </details>
       <p class="hint">✓ = detected. Switching the embedder resets the graph
         (new vector space); the llm swaps freely. hash/mock need no models —
         demo mode.</p>

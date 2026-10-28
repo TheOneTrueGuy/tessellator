@@ -26,7 +26,10 @@ Selected three ways, in order of precedence:
    Paste an endpoint URL (e.g. a RunPod proxy URL for `ollama`) or an
    OpenAI API key right there. Switching the **embedder resets the graph**
    (new vector space); the llm swaps freely. `hash`/`mock` need no models
-   at all — that's demo mode.
+   at all — that's demo mode. The **RunPod** expander can also deploy /
+   resume / stop a pod for you: paste your API key (kept in server memory
+   only, never written to disk or committed), and it deploys the pod, waits
+   for Ollama, pulls the models, and pre-fills the ollama URL.
 2. **CLI flags** — `python app.py --embed-backend ollama --llm-backend openai \
    --ollama-url https://<id>-11434.proxy.runpod.net [--port 5000]`
    (`run_app.sh` forwards args, e.g. `./run_app.sh --llm-backend mock`).
@@ -110,7 +113,14 @@ stop the pod when idle.
    k keeping `var` fraction of variance). "3D view" projects all graph
    nodes into the lens; expand **prompts** on the lens item to inspect the
    generated set.
-6. **Shutdown** button: stops the pod (disk kept, resumable) then exits the
+6. **Session save/load** (top of the sidebar): Save writes graph + lenses to
+   `.cache/session.json` (or a name you give). Load restores them — lenses
+   come back with no embedding calls (their basis/mean serialize), node
+   vectors re-embed through the disk cache. Loading refuses if the active
+   embedder differs from the session's (different vector space) — switch
+   backends first. The Shutdown button also autosaves to
+   `session-autosave.json`.
+7. **Shutdown** button: stops the pod (disk kept, resumable) then exits the
    server. `POST /api/shutdown` accepts `{"pod": "stop"|"terminate"|"none"}`.
 
 ## Repo layout

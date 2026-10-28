@@ -221,14 +221,36 @@ async function extendPole() {
   } catch (e) { status(e.message, true); }
 }
 
+/* ---------- session save/load ---------- */
+
+async function saveSession() {
+  status("saving session…");
+  try {
+    const j = await api("/api/save", { file: $("saveFile").value.trim() || undefined });
+    status(`saved ${j.nodes} nodes + ${j.lenses} lenses → ${j.saved}`);
+  } catch (e) { status(e.message, true); }
+}
+
+async function loadSession() {
+  status("loading session…");
+  try {
+    const j = await api("/api/load", { file: $("saveFile").value.trim() || undefined });
+    selection = []; activeLens = null;
+    drawGraph(j.graph);
+    $("lensList").innerHTML = "";
+    (j.lenses || []).forEach(addLensItem);
+    status(`loaded ${j.graph.nodes.length} nodes + ${(j.lenses || []).length} lenses ← ${j.loaded}`);
+  } catch (e) { status(e.message, true); }
+}
+
 /* ---------- backends ---------- */
 
 const EMBED_BACKENDS = ["auto", "ollama", "lmstudio", "openai", "local", "hash"];
 const LLM_BACKENDS = ["auto", "ollama", "lmstudio", "openai", "mock"];
 const BACKEND_FIELDS = {
-  ollama:   [["url", "endpoint URL", "http://localhost:11434"],
+  ollama:   [["url", "endpoint URL (blank = current/default)", ""],
              ["model", "model (blank = env/default)", ""]],
-  lmstudio: [["url", "endpoint URL", "http://localhost:1234/v1"],
+  lmstudio: [["url", "endpoint URL (blank = default :1234)", ""],
              ["model", "model (blank = auto-detect)", ""]],
   openai:   [["key", "API key", ""],
              ["url", "base URL (blank = default)", ""],
@@ -294,6 +316,44 @@ async function applyBackends() {
   } catch (e) { status(e.message, true); }
 }
 
+/* ---------- runpod ---------- */
+
+let rpPoll = null;
+
+async function runpodOp(action) {
+  try {
+    await api("/api/runpod", {
+      action,
+      key: $("rpKey").value.trim() || undefined,
+      gpu: $("rpGpu").value.trim() || undefined,
+      pod_id: $("rpPodId").value.trim() || undefined,
+    });
+    $("rpStatus").textContent = "starting…";
+    if (!rpPoll) rpPoll = setInterval(pollRunpod, 4000);
+  } catch (e) { $("rpStatus").textContent = e.message; }
+}
+
+async function pollRunpod() {
+  try {
+    const j = await getJSON("/api/runpod");
+    $("rpStatus").textContent =
+      j.stage === "ready" ? `ready · ${j.url}`
+      : j.stage === "error" ? `error: ${j.error}`
+      : `${j.stage}${j.detail ? " — " + j.detail : ""}`;
+    if (j.stage === "ready") {
+      clearInterval(rpPoll); rpPoll = null;
+      $("embedBackend").value = "ollama"; $("llmBackend").value = "ollama";
+      renderCfg("embed"); renderCfg("llm");
+      if ($("embed_url")) $("embed_url").value = j.url;
+      if ($("llm_url")) $("llm_url").value = j.url;
+      status("pod ready — Apply backends to use it");
+      loadBackends();
+    } else if (["error", "stopped", "idle"].includes(j.stage)) {
+      clearInterval(rpPoll); rpPoll = null;
+    }
+  } catch (e) { /* transient poll failure */ }
+}
+
 /* ---------- boot ---------- */
 
 function refreshBadges(j) {
@@ -308,6 +368,10 @@ async function boot() {
   refreshBadges(j);
   currentEmbed = j.embedder;
   if (j.graph.nodes.length) drawGraph(j.graph);
+  try {
+    const l = await getJSON("/api/lenses");
+    (l.lenses || []).forEach(addLensItem);
+  } catch (e) { /* lens listing unsupported */ }
   loadBackends();
 }
 
@@ -321,6 +385,11 @@ $("lensBtn").onclick = createLens;
 $("embedBackend").onchange = () => renderCfg("embed");
 $("llmBackend").onchange = () => renderCfg("llm");
 $("backendApply").onclick = applyBackends;
+$("saveBtn").onclick = saveSession;
+$("loadBtn").onclick = loadSession;
+$("rpDeploy").onclick = () => runpodOp("deploy");
+$("rpResume").onclick = () => runpodOp("resume");
+$("rpStop").onclick = () => runpodOp("stop");
 $("shutdownBtn").onclick = async () => {
   if (!confirm("Stop the RunPod pod and shut down this server?")) return;
   try {
